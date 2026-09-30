@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DownloadFlow</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg1:#0f172a;--bg2:#1e293b;--card:rgba(255,255,255,.08);--border:rgba(255,255,255,.13);--text:#f8fafc;--muted:#94a3b8;--accent:#ef4444;--accent2:#f97316;--success:#22c55e}
+body{margin:0;min-height:100dvh;font-family:Inter,Arial,sans-serif;color:var(--text);background:radial-gradient(circle at top left,rgba(239,68,68,.22),transparent 35%),radial-gradient(circle at bottom right,rgba(249,115,22,.18),transparent 35%),linear-gradient(135deg,var(--bg1),var(--bg2));padding:clamp(14px,3vw,40px)}
+.container{width:min(1100px,100%);margin:auto}
+.hero{text-align:center;margin-bottom:28px}.logo{font-size:clamp(30px,5vw,48px);font-weight:900;letter-spacing:-2px;margin:0}.logo span{color:var(--accent)}.subtitle{color:var(--muted);margin-top:8px}
+.card{background:var(--card);border:1px solid var(--border);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:24px;padding:clamp(18px,3vw,32px);box-shadow:0 20px 70px rgba(0,0,0,.25)}
+.search-row{display:grid;grid-template-columns:1fr auto;gap:12px}input{width:100%;min-height:54px;padding:0 18px;border:1px solid rgba(255,255,255,.14);border-radius:14px;outline:none;background:rgba(0,0,0,.2);color:#fff;font-size:16px}input:focus{border-color:rgba(239,68,68,.7)}
+button{border:0;min-height:54px;border-radius:14px;padding:0 24px;color:#fff;font-weight:800;font-size:15px;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));transition:.2s}button:hover{transform:translateY(-1px)}button:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.examples{margin-top:12px;color:var(--muted);font-size:13px}.hidden{display:none!important}
+.status{margin-top:22px;padding:15px;border-radius:14px;background:rgba(0,0,0,.18);color:var(--muted)}.error{color:#fecaca;background:rgba(127,29,29,.35);border:1px solid rgba(248,113,113,.2)}
+.video-info{margin-top:24px;display:grid;grid-template-columns:minmax(180px,300px) 1fr;gap:24px}.thumbnail{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:18px;background:rgba(0,0,0,.2)}.video-title{font-size:clamp(20px,3vw,30px);line-height:1.2;margin:0 0 10px}.meta{color:var(--muted);line-height:1.7}
+.formats{margin-top:26px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.format-btn{min-height:52px;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1)}.format-btn:hover{background:rgba(255,255,255,.12)}
+.progress-card{margin-top:26px;padding:20px;border-radius:18px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.08)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:22px}.step{padding:10px;text-align:center;border-radius:12px;color:var(--muted);background:rgba(255,255,255,.04);font-size:13px}.step.active{color:#fff;background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.35)}.step.done{color:#bbf7d0;background:rgba(34,197,94,.12)}
+.progress-top{display:flex;justify-content:space-between;gap:15px;margin-bottom:9px}.progress-title{font-weight:800}.percent{font-size:24px;font-weight:900}
+.progress-track{height:14px;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.08)}.progress-bar{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .25s ease}
+.progress-details{margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.detail{padding:12px;border-radius:12px;background:rgba(255,255,255,.045)}.detail-label{color:var(--muted);font-size:12px}.detail-value{margin-top:3px;font-weight:800}
+.success-box{margin-top:16px;padding:15px;border-radius:14px;color:#bbf7d0;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.2)}
+footer{text-align:center;margin-top:24px;color:var(--muted);font-size:12px}
+@media(max-width:800px){.formats{grid-template-columns:repeat(2,1fr)}.video-info{grid-template-columns:1fr}}
+@media(max-width:600px){body{padding:12px}.search-row{grid-template-columns:1fr}.formats{grid-template-columns:1fr}.steps{grid-template-columns:1fr}.progress-details{grid-template-columns:1fr}.card{border-radius:18px}}
+</style>
+</head>
+<body>
+<div class="container">
+<header class="hero">
+<h1 class="logo">Download<span>Flow</span></h1>
+<div class="subtitle">Télécharge tes vidéos simplement et suis la progression en temps réel.</div>
+</header>
+
+<main class="card">
+<div class="search-row">
+<input id="urlInput" type="url" placeholder="Colle ton lien YouTube ici..." autocomplete="off">
+<button id="analyzeBtn">Analyser</button>
+</div>
+<div class="examples">YouTube • Shorts • Vidéos publiques</div>
+<div id="status" class="status hidden"></div>
+
+<section id="videoSection" class="hidden">
+<div class="video-info">
+<img id="thumbnail" class="thumbnail" alt="Miniature">
+<div>
+<h2 id="videoTitle" class="video-title"></h2>
+<div class="meta">
+<div id="videoChannel"></div>
+<div id="videoDuration"></div>
+</div>
+</div>
+</div>
+
+<div class="formats" id="formats"></div>
+
+<div id="progressCard" class="progress-card hidden">
+<div class="steps">
+<div id="stepAnalysis" class="step done">① Analyse</div>
+<div id="stepDownload" class="step">② Téléchargement</div>
+<div id="stepFusion" class="step">③ Fusion</div>
+</div>
+
+<div class="progress-top">
+<div id="progressTitle" class="progress-title">Préparation...</div>
+<div id="percent" class="percent">0%</div>
+</div>
+
+<div class="progress-track">
+<div id="progressBar" class="progress-bar"></div>
+</div>
+
+<div class="progress-details">
+<div class="detail">
+<div class="detail-label">Temps restant</div>
+<div id="eta" class="detail-value">--</div>
+</div>
+<div class="detail">
+<div class="detail-label">Vitesse</div>
+<div id="speed" class="detail-value">--</div>
+</div>
+<div class="detail">
+<div class="detail-label">État</div>
+<div id="state" class="detail-value">En attente</div>
+</div>
+</div>
+
+<div id="successBox" class="success-box hidden">
+✓ Ton fichier est prêt. Le téléchargement va commencer.
+</div>
+</div>
+</section>
+</main>
+
+<footer>
+Utilise DownloadFlow uniquement pour les contenus que tu as le droit de télécharger et respecte les règles de la plateforme.
+</footer>
+</div>
+
+<script>
+const API_URL='';
+
+const urlInput=document.getElementById('urlInput');
+const analyzeBtn=document.getElementById('analyzeBtn');
+const statusBox=document.getElementById('status');
+const videoSection=document.getElementById('videoSection');
+const thumbnail=document.getElementById('thumbnail');
+const videoTitle=document.getElementById('videoTitle');
+const videoChannel=document.getElementById('videoChannel');
+const videoDuration=document.getElementById('videoDuration');
+const formats=document.getElementById('formats');
+const progressCard=document.getElementById('progressCard');
+const progressBar=document.getElementById('progressBar');
+const percent=document.getElementById('percent');
+const eta=document.getElementById('eta');
+const speed=document.getElementById('speed');
+const state=document.getElementById('state');
+const progressTitle=document.getElementById('progressTitle');
+const successBox=document.getElementById('successBox');
+const stepAnalysis=document.getElementById('stepAnalysis');
+const stepDownload=document.getElementById('stepDownload');
+const stepFusion=document.getElementById('stepFusion');
+
+let currentVideo=null;
+let currentEventSource=null;
+
+function showStatus(message,error=false){
+  statusBox.textContent=message;
+  statusBox.classList.remove('hidden','error');
+  if(error) statusBox.classList.add('error');
+}
+
+function hideStatus(){
+  statusBox.classList.add('hidden');
+}
+
+function setStep(step){
+  [stepAnalysis,stepDownload,stepFusion].forEach(e=>{
+    e.classList.remove('active');
+  });
+
+  if(step==='analysis'){
+    stepAnalysis.classList.add('active');
+  }
+
+  if(step==='download'){
+    stepAnalysis.classList.add('done');
+    stepDownload.classList.add('active');
+  }
+
+  if(step==='fusion'){
+    stepAnalysis.classList.add('done');
+    stepDownload.classList.add('done');
+    stepFusion.classList.add('active');
+  }
+
+  if(step==='complete'){
+    stepAnalysis.classList.add('done');
+    stepDownload.classList.add('done');
+    stepFusion.classList.add('done');
+  }
+}
+
+function resetProgress(){
+  progressCard.classList.remove('hidden');
+  successBox.classList.add('hidden');
+
+  progressBar.style.width='0%';
+  percent.textContent='0%';
+  eta.textContent='--';
+  speed.textContent='--';
+  state.textContent='Préparation';
+  progressTitle.textContent='Préparation du téléchargement...';
+
+  setStep('download');
+}
+
+function updateProgress(data){
+  const n=Number(data.percent);
+
+  if(Number.isFinite(n)){
+    const value=Math.max(0,Math.min(100,n));
+    progressBar.style.width=value+'%';
+    percent.textContent=Math.round(value)+'%';
+  }
+
+  if(data.eta) eta.textContent=data.eta;
+  if(data.speed) speed.textContent=data.speed;
+  if(data.message) progressTitle.textContent=data.message;
+
+  if(data.stage==='download'){
+    setStep('download');
+    state.textContent='Téléchargement';
+  }
+
+  if(data.stage==='fusion'){
+    setStep('fusion');
+    state.textContent='Fusion';
+    progressTitle.textContent=data.message||'Fusion vidéo + audio...';
+  }
+
+  if(data.stage==='complete'){
+    setStep('complete');
+    progressBar.style.width='100%';
+    percent.textContent='100%';
+    eta.textContent='0s';
+    speed.textContent='Terminé';
+    state.textContent='Terminé';
+    progressTitle.textContent='Téléchargement terminé';
+    successBox.classList.remove('hidden');
+  }
+
+  if(data.stage==='error'){
+    state.textContent='Erreur';
+    progressTitle.textContent=data.message||'Erreur';
+  }
+}
+
+async function analyze(){
+  const url=urlInput.value.trim();
+
+  if(!url){
+    showStatus('Colle d’abord un lien YouTube.',true);
+    return;
+  }
+
+  analyzeBtn.disabled=true;
+  videoSection.classList.add('hidden');
+  hideStatus();
+
+  try{
+    const response=await fetch(`${API_URL}/api/analyze`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url})
+    });
+
+    const data=await response.json();
+
+    if(!response.ok){
+      throw new Error(data.error||'Erreur pendant l’analyse.');
+    }
+
+    currentVideo=data.video;
+
+    thumbnail.src=data.video.thumbnail||'';
+    thumbnail.alt=data.video.title||'Vidéo';
+
+    videoTitle.textContent=data.video.title||'Vidéo YouTube';
+    videoChannel.textContent=`Chaîne : ${data.video.channel||data.video.uploader||'YouTube'}`;
+    videoDuration.textContent=`Durée : ${data.video.duration||'Inconnue'}`;
+
+    formats.innerHTML='';
+
+    for(const f of data.formats){
+      const b=document.createElement('button');
+
+      b.className='format-btn';
+      b.textContent=f.label;
+
+      b.addEventListener('click',()=>{
+        startDownload(f.id);
+      });
+
+      formats.appendChild(b);
+    }
+
+    videoSection.classList.remove('hidden');
+
+  }catch(e){
+    showStatus(e.message,true);
+  }finally{
+    analyzeBtn.disabled=false;
+  }
+}
+
+async function startDownload(format){
+  if(!currentVideo) return;
+
+  if(currentEventSource){
+    currentEventSource.close();
+    currentEventSource=null;
+  }
+
+  resetProgress();
+
+  document.querySelectorAll('.format-btn').forEach(b=>{
+    b.disabled=true;
+  });
+
+  try{
+    const response=await fetch(`${API_URL}/api/download`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        url:currentVideo.webpage_url,
+        format,
+        title:currentVideo.title
+      })
+    });
+
+    const data=await response.json();
+
+    if(!response.ok||!data.jobId){
+      throw new Error(data.error||'Impossible de créer le téléchargement.');
+    }
+
+    listenProgress(data.jobId);
+
+  }catch(e){
+    showStatus(e.message,true);
+
+    document.querySelectorAll('.format-btn').forEach(b=>{
+      b.disabled=false;
+    });
+  }
+}
+
+function listenProgress(jobId){
+  currentEventSource=new EventSource(
+    `${API_URL}/api/progress/${encodeURIComponent(jobId)}`
+  );
+
+  currentEventSource.onopen=()=>{
+    console.log('[DownloadFlow] Connexion progression ouverte.');
+  };
+
+  currentEventSource.onmessage=event=>{
+    try{
+      const data=JSON.parse(event.data);
+
+      console.log('[DownloadFlow] Progression:',data);
+
+      updateProgress(data);
+
+      if(data.stage==='complete'){
+        currentEventSource.close();
+        currentEventSource=null;
+
+        const link=document.createElement('a');
+
+        link.href=
+          `${API_URL}/api/download/${encodeURIComponent(jobId)}/file`;
+
+        link.style.display='none';
+
+        document.body.appendChild(link);
+        link.click();
+
+        setTimeout(()=>{
+          link.remove();
+        },1000);
+
+        document.querySelectorAll('.format-btn').forEach(b=>{
+          b.disabled=false;
+        });
+      }
+
+      if(data.stage==='error'){
+        currentEventSource.close();
+        currentEventSource=null;
+
+        showStatus(
+          data.message||'Le téléchargement a échoué.',
+          true
+        );
+
+        document.querySelectorAll('.format-btn').forEach(b=>{
+          b.disabled=false;
+        });
+      }
+
+    }catch(e){
+      console.error(
+        '[DownloadFlow] Erreur progression:',
+        e
+      );
+    }
+  };
+
+  currentEventSource.onerror=()=>{
+    console.warn(
+      '[DownloadFlow] Connexion de progression interrompue.'
+    );
+  };
+}
+
+analyzeBtn.addEventListener('click',analyze);
+
+urlInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter') analyze();
+});
+</script>
+</body>
+</html>
