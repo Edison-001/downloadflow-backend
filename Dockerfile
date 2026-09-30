@@ -1,13 +1,20 @@
 FROM node:20-bookworm-slim
 
-# Installer FFmpeg et les outils nécessaires
+# Installer FFmpeg, Python et les outils nécessaires
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ffmpeg \
         python3 \
         ca-certificates \
-        curl && \
+        curl \
+        unzip && \
     rm -rf /var/lib/apt/lists/*
+
+# Installer Deno
+RUN curl -fsSL https://deno.land/install.sh | sh
+
+ENV DENO_INSTALL=/root/.deno
+ENV PATH=/root/.deno/bin:$PATH
 
 # Installer yt-dlp
 RUN curl -L \
@@ -22,13 +29,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copier le reste du projet
+# Copier le projet
 COPY . .
 
-# Port utilisé par Render
+# Port Render
 ENV PORT=10000
 
 EXPOSE 10000
 
-# Démarrer DownloadFlow
 CMD ["npm", "start"]
