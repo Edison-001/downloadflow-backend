@@ -17,6 +17,25 @@ const YTDLP_COMMAND =
     ? 'yt-dlp.exe'
     : 'yt-dlp';
 
+
+// ============================================================
+// YOUTUBE COOKIES
+// ============================================================
+
+function getCookiesPath() {
+  const candidates = [
+    '/etc/secrets/cookies.txt',
+    path.join(__dirname, 'cookies.txt'),
+  ];
+
+  return candidates.find(file => fs.existsSync(file)) || null;
+}
+
+
+// ============================================================
+// MIDDLEWARE
+// ============================================================
+
 app.use(cors());
 
 app.use(
@@ -286,15 +305,10 @@ function broadcast(job) {
 
   const payload = JSON.stringify({
     type,
-
     stage: job.stage,
-
     percent: job.percent,
-
     speed: job.speed,
-
     eta: job.eta,
-
     message: job.message,
   });
 
@@ -689,14 +703,41 @@ app.post(
     }
 
     try {
+      const analyzeArgs = [
+        '--dump-single-json',
+        '--no-playlist',
+        '--skip-download',
+        '--no-warnings',
+      ];
+
+      // --------------------------------------------------------
+      // COOKIES
+      // --------------------------------------------------------
+
+      const cookiesPath =
+        getCookiesPath();
+
+      if (cookiesPath) {
+        console.log(
+          `[COOKIES] Analyse avec: ${cookiesPath}`,
+        );
+
+        analyzeArgs.push(
+          '--cookies',
+          cookiesPath,
+        );
+      } else {
+        console.log(
+          '[COOKIES] Aucun fichier cookies trouvé.',
+        );
+      }
+
+      analyzeArgs.push(url);
+
       const result =
-        await spawnSimple([
-          '--dump-single-json',
-          '--no-playlist',
-          '--skip-download',
-          '--no-warnings',
-          url,
-        ]);
+        await spawnSimple(
+          analyzeArgs,
+        );
 
       const info = JSON.parse(
         result.stdout,
@@ -907,6 +948,28 @@ app.post(
           '-o',
           outputTemplate,
         ];
+
+        // ----------------------------------------------------
+        // COOKIES
+        // ----------------------------------------------------
+
+        const cookiesPath =
+          getCookiesPath();
+
+        if (cookiesPath) {
+          console.log(
+            `[COOKIES] Téléchargement avec: ${cookiesPath}`,
+          );
+
+          args.push(
+            '--cookies',
+            cookiesPath,
+          );
+        } else {
+          console.log(
+            '[COOKIES] Aucun fichier cookies trouvé.',
+          );
+        }
 
         // ----------------------------------------------------
         // AUDIO
@@ -1393,6 +1456,20 @@ app.listen(
     console.log(
       `yt-dlp  : ${YTDLP_COMMAND}`,
     );
+
+    const cookiesPath =
+      getCookiesPath();
+
+    if (cookiesPath) {
+      console.log(
+        `Cookies : ${cookiesPath}`,
+      );
+    } else {
+      console.log(
+        'Cookies : aucun fichier trouvé',
+      );
+    }
+
     console.log('');
   },
 );
