@@ -28,7 +28,44 @@ function getCookiesPath() {
     path.join(__dirname, 'cookies.txt'),
   ];
 
-  return candidates.find(file => fs.existsSync(file)) || null;
+  const source = candidates.find(
+    file => fs.existsSync(file),
+  );
+
+  if (!source) {
+    return null;
+  }
+
+  // Render monte /etc/secrets en lecture seule.
+  // yt-dlp peut essayer de mettre à jour le fichier cookies.
+  // On travaille donc sur une copie temporaire lorsque
+  // le fichier source vient de /etc/secrets.
+  if (source === '/etc/secrets/cookies.txt') {
+    const tempCookies =
+      '/tmp/downloadflow-cookies.txt';
+
+    try {
+      fs.copyFileSync(
+        source,
+        tempCookies,
+      );
+
+      console.log(
+        `[COOKIES] Copie temporaire créée: ${tempCookies}`,
+      );
+
+      return tempCookies;
+    } catch (error) {
+      console.error(
+        '[COOKIES] Impossible de copier le fichier cookies:',
+        error.message,
+      );
+
+      return null;
+    }
+  }
+
+  return source;
 }
 
 
@@ -708,6 +745,9 @@ app.post(
         '--no-playlist',
         '--skip-download',
         '--no-warnings',
+
+        // Ne pas utiliser le cache yt-dlp.
+        '--no-cache-dir',
       ];
 
       // --------------------------------------------------------
@@ -936,6 +976,9 @@ app.post(
           '--newline',
 
           '--progress',
+
+          // Ne pas utiliser le cache yt-dlp.
+          '--no-cache-dir',
 
           '--restrict-filenames',
 
